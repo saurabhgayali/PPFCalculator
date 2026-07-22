@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-100 text-slate-800">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPF Calculator - Excel Style Monthly Interest Ledger</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            excel: {
+              700: '#107c41',
+              800: '#0f6c38',
+              900: '#0b522a',
+              light: '#f3f2f1',
+              border: '#e1dfdd',
+              header: '#f8f9fa',
+              selected: '#e7f3ec'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    /* Excel-like crisp typography and grid styling */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+    }
+    
+    .excel-table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .excel-table th {
+      background-color: #f3f4f6;
+      border-right: 1px solid #cbd5e1;
+      border-bottom: 1px solid #cbd5e1;
+      font-weight: 600;
+      color: #334155;
+      user-select: none;
+    }
+
+    .excel-table td {
+      border-right: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 4px 8px;
+    }
+
+    .excel-input {
+      background-color: transparent;
+      width: 100%;
+      border: 1px solid transparent;
+      padding: 3px 6px;
+      font-size: 12px;
+      border-radius: 2px;
+      transition: all 0.1s ease;
+    }
+
+    .excel-input:focus {
+      background-color: #ffffff;
+      border-color: #107c41;
+      outline: 2px solid #107c41;
+      outline-offset: -1px;
+    }
+
+    .excel-row:hover {
+      background-color: #f8fafc;
+    }
+
+    .excel-tab.active {
+      background-color: #ffffff;
+      color: #107c41;
+      border-top: 3px solid #107c41;
+      font-weight: 600;
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col bg-slate-100 text-slate-800 antialiased selection:bg-emerald-200">
+
+  <!-- Top Title Bar (Excel Style) -->
+  <header class="bg-excel-700 text-white flex items-center justify-between px-4 py-2 shadow-md">
+    <div class="flex items-center gap-3">
+      <div class="bg-white/20 p-1.5 rounded flex items-center justify-center">
+        <i class="fa-solid fa-file-excel text-lg text-white"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-base leading-tight tracking-wide flex items-center gap-2">
+          PPF Calculator
+          <span class="text-xs font-normal bg-emerald-900/60 text-emerald-200 px-2 py-0.5 rounded border border-emerald-500/30">
+            Monthly SI & Deposit Rule Model
+          </span>
+        </h1>
+        <p class="text-[11px] text-emerald-100/80">Monthly Interest Ledger & Cutoff Rule Simulation (INR ₹)</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 text-xs">
+      <button id="btnExportCSV" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded border border-emerald-600 transition flex items-center gap-1.5" title="Export Deposit Entry Ledger">
+        <i class="fa-solid fa-file-csv text-emerald-300"></i> Export Ledger CSV
+      </button>
+      <button id="btnExportMonthlyCSV" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded border border-emerald-600 transition flex items-center gap-1.5" title="Download Monthwise Interest Schedule">
+        <i class="fa-solid fa-file-excel text-emerald-300"></i> Export Monthly Sheet
+      </button>
+      <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-rotate-left"></i> Reset
+      </button>
+    </div>
+  </header>
+
+  <!-- Formula & Configuration Toolbar (Excel Ribbon Style) -->
+  <div class="bg-white border-b border-slate-300 px-4 py-2.5 shadow-sm space-y-2">
+    <!-- Configuration Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-center text-xs">
+      
+      <!-- Target Calculation Date -->
+      <div class="flex items-center gap-2 bg-amber-50/80 p-1.5 rounded border border-amber-300/80">
+        <label for="inputCalculationDate" class="font-semibold text-amber-900 whitespace-nowrap">
+          <i class="fa-solid fa-clock text-amber-700 mr-1"></i>Calculation Date:
+        </label>
+        <input type="date" id="inputCalculationDate" class="excel-input font-mono font-bold text-slate-900 bg-white border-amber-300">
+      </div>
+
+      <!-- Default Interest Rate -->
+      <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded border border-slate-200">
+        <label for="inputBaseRate" class="font-medium text-slate-600 whitespace-nowrap">
+          <i class="fa-solid fa-percent text-emerald-700 mr-1"></i>Default Rate (p.a.):
+        </label>
+        <div class="flex items-center gap-1 w-full">
+          <input type="number" id="inputBaseRate" step="0.05" min="0" max="30" value="7.10" class="excel-input font-semibold text-slate-900 text-right bg-white border-slate-300">
+          <span class="font-bold text-slate-500">%</span>
+        </div>
+      </div>
+
+      <!-- Customizable Cutoff Day -->
+      <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded border border-slate-200">
+        <label for="inputCutoffDay" class="font-medium text-slate-600 whitespace-nowrap" title="Deposits on or before this day get interest for current month. Deposits after this day start earning interest next month.">
+          <i class="fa-solid fa-calendar-day text-emerald-700 mr-1"></i>Monthly Cutoff Day:
+        </label>
+        <div class="flex items-center gap-1 w-full">
+          <input type="number" id="inputCutoffDay" min="1" max="28" value="5" class="excel-input font-semibold text-slate-900 text-right bg-white border-slate-300">
+          <span class="text-[10px] text-slate-500 font-medium">th</span>
+        </div>
+      </div>
+
+      <!-- Cutoff Enforcement Mode -->
+      <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded border border-slate-200">
+        <label for="selectCutoffRule" class="font-medium text-slate-600 whitespace-nowrap">
+          <i class="fa-solid fa-filter text-emerald-700 mr-1"></i>Deposit Rule:
+        </label>
+        <select id="selectCutoffRule" class="excel-input text-xs font-semibold text-slate-900 bg-white border-slate-300">
+          <option value="strict">Strict Cutoff (PPF Rule: On/Before Day)</option>
+          <option value="none">No Cutoff (Immediate Same Month)</option>
+        </select>
+      </div>
+
+      <!-- Interest Crediting Mode -->
+      <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded border border-slate-200">
+        <label for="selectCreditingMode" class="font-medium text-slate-600 whitespace-nowrap">
+          <i class="fa-solid fa-coins text-emerald-700 mr-1"></i>Interest Credit:
+        </label>
+        <select id="selectCreditingMode" class="excel-input text-xs font-semibold text-slate-900 bg-white border-slate-300">
+          <option value="fy_end">Annual Credit at FY End (PPF standard)</option>
+          <option value="monthly">Monthly Additive (Compounded Monthly)</option>
+          <option value="simple_accum">Simple Interest Accumulation</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- Formula Bar Display -->
+    <div class="flex items-center gap-2 text-xs font-mono bg-slate-50 border border-slate-300 rounded px-2 py-1">
+      <span class="font-bold text-emerald-800 select-none">fx</span>
+      <div class="h-3 w-px bg-slate-300"></div>
+      <div id="formulaBarText" class="text-slate-600 truncate w-full">
+        Monthly Interest = Minimum Eligible Balance (between cutoff day and month end) × Rate / 1200
+      </div>
+    </div>
+  </div>
+
+  <!-- Excel Top KPI Summary Bar -->
+  <div class="bg-slate-200/80 border-b border-slate-300 px-4 py-2 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+    <div class="bg-white p-2 rounded border border-slate-300">
+      <div class="text-[10px] uppercase font-bold text-slate-500">Total Deposits</div>
+      <div id="kpiTotalDeposits" class="text-sm font-extrabold text-slate-800 font-mono">₹0.00</div>
+    </div>
+    <div class="bg-white p-2 rounded border border-slate-300">
+      <div class="text-[10px] uppercase font-bold text-slate-500">Total Interest Earned</div>
+      <div id="kpiTotalInterest" class="text-sm font-extrabold text-emerald-700 font-mono">₹0.00</div>
+    </div>
+    <div class="bg-white p-2 rounded border border-slate-300">
+      <div class="text-[10px] uppercase font-bold text-slate-500">Maturity Balance</div>
+      <div id="kpiMaturityBalance" class="text-sm font-extrabold text-indigo-700 font-mono">₹0.00</div>
+    </div>
+    <div class="bg-white p-2 rounded border border-slate-300">
+      <div class="text-[10px] uppercase font-bold text-slate-500">Total Months Active</div>
+      <div id="kpiActiveMonths" class="text-sm font-bold text-slate-700 font-mono">0 Months</div>
+    </div>
+    <div class="bg-white p-2 rounded border border-slate-300">
+      <div class="text-[10px] uppercase font-bold text-slate-500">Effective Monthly Yield</div>
+      <div id="kpiMonthlyYield" class="text-sm font-bold text-slate-700 font-mono">0.00%</div>
+    </div>
+    <div class="bg-white p-2 rounded border border-slate-300">
+      <div class="text-[10px] uppercase font-bold text-slate-500">Overall ROI</div>
+      <div id="kpiROI" class="text-sm font-bold text-emerald-700 font-mono">+0.00%</div>
+    </div>
+  </div>
+
+  <!-- Main Workbench Sheet Area -->
+  <main class="flex-1 flex flex-col overflow-hidden bg-white">
+    
+    <!-- SHEET 1: DEPOSIT LEDGER (TRANSACTIONS ENTRY) -->
+    <section id="sheetLedger" class="flex-1 flex flex-col overflow-hidden">
+      <!-- Toolbar controls for Ledger -->
+      <div class="bg-slate-100 border-b border-slate-300 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-700 flex items-center gap-1">
+            <i class="fa-solid fa-table-list text-emerald-700"></i> Deposit Entry Ledger
+          </span>
+          <span class="text-slate-400">|</span>
+          <span class="text-slate-500">Add deposits or withdrawals on any date. Cutoff day rule applies automatically.</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnRecalculateSheet" class="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Calculate interest using current ledger entries">
+            <i class="fa-solid fa-calculator"></i> Update & Recalculate
+          </button>
+          <button id="btnAddRow" class="bg-slate-700 hover:bg-slate-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1 shadow-sm">
+            <i class="fa-solid fa-plus text-xs"></i> Add Deposit Row
+          </button>
+          <button id="btnClearAllLedger" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1 rounded text-xs font-medium transition border border-slate-300">
+            Clear Rows
+          </button>
+        </div>
+      </div>
+
+      <!-- Ledger Table Container -->
+      <div class="flex-1 overflow-auto p-4 bg-slate-50">
+        <div class="bg-white rounded border border-slate-300 shadow-sm overflow-hidden">
+          <table class="excel-table w-full text-left font-mono">
+            <thead>
+              <tr class="text-xs">
+                <th class="w-10 text-center py-2 px-1">#</th>
+                <th class="w-36 py-2 px-2">Deposit Date</th>
+                <th class="w-32 py-2 px-2">Type</th>
+                <th class="w-40 py-2 px-2 text-right">Amount (₹)</th>
+                <th class="w-32 py-2 px-2 text-center">Cutoff Status</th>
+                <th class="w-32 py-2 px-2 text-center">Rate Override (% p.a.)</th>
+                <th class="py-2 px-2">Notes / Description</th>
+                <th class="w-16 text-center py-2 px-1">Action</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerTableBody">
+              <!-- Dynamic Rows populated by JS -->
+            </tbody>
+          </table>
+          <div id="emptyLedgerMessage" class="hidden text-center py-12 bg-white">
+            <i class="fa-solid fa-receipt text-3xl text-slate-300 mb-2"></i>
+            <p class="text-slate-500 text-xs font-sans">No deposits added yet. Click <strong>"Add Deposit Row"</strong> above or <strong>"Load Demo Data"</strong> to begin.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHEET 2: MONTH-BY-MONTH INTEREST SCHEDULE (PASSBOOK) -->
+    <section id="sheetSchedule" class="flex-1 flex flex-col overflow-hidden hidden">
+      <div class="bg-slate-100 border-b border-slate-300 px-4 py-2 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-700 flex items-center gap-1">
+            <i class="fa-solid fa-calendar-days text-emerald-700"></i> Monthly Interest Statement (Passbook)
+          </span>
+          <span class="text-slate-400">|</span>
+          <span id="scheduleRuleNotice" class="text-slate-500">Showing interest calculated monthly on eligible minimum balance up to calculation date.</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnExportMonthlySheetInner" class="bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1">
+            <i class="fa-solid fa-download text-xs"></i> Export Monthwise Sheet (CSV)
+          </button>
+          <span class="text-slate-500 font-mono text-[11px]" id="scheduleSummaryCount">
+            0 Months Generated
+          </span>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto p-4 bg-slate-50">
+        <div class="bg-white rounded border border-slate-300 shadow-sm overflow-hidden">
+          <table class="excel-table w-full text-left font-mono text-xs">
+            <thead>
+              <tr class="text-xs">
+                <th class="w-12 text-center py-2 px-1">Month</th>
+                <th class="w-28 py-2 px-2">Month & Year</th>
+                <th class="w-32 py-2 px-2 text-right">Opening Principal (₹)</th>
+                <th class="w-32 py-2 px-2 text-right text-emerald-800">Eligible Deposits (≤ <span class="cutoffLabel">5</span>th)</th>
+                <th class="w-32 py-2 px-2 text-right text-amber-800">Shifted Deposits (> <span class="cutoffLabel">5</span>th)</th>
+                <th class="w-28 py-2 px-2 text-right text-rose-700">Withdrawals (₹)</th>
+                <th class="w-36 py-2 px-2 text-right bg-emerald-50">Eligible For SI (₹)</th>
+                <th class="w-20 py-2 px-2 text-center">Rate (% p.a.)</th>
+                <th class="w-32 py-2 px-2 text-right text-emerald-700 font-bold">Monthly Interest (₹)</th>
+                <th class="w-36 py-2 px-2 text-right font-bold">Closing Balance (₹)</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Excel Sheet Tabs Footer -->
+  <footer class="bg-slate-200 border-t border-slate-300 flex items-center justify-between px-2 text-xs select-none">
+    <div class="flex items-center gap-1 pt-1">
+      <button data-tab="sheetLedger" class="excel-tab active px-4 py-1.5 border border-slate-300 rounded-t bg-slate-100 hover:bg-white transition flex items-center gap-1.5 text-xs">
+        <i class="fa-solid fa-list-check text-slate-600"></i> Deposit Ledger
+      </button>
+      <button data-tab="sheetSchedule" class="excel-tab px-4 py-1.5 border border-slate-300 rounded-t bg-slate-100 hover:bg-white transition flex items-center gap-1.5 text-xs">
+        <i class="fa-solid fa-table text-slate-600"></i> Monthly Interest Schedule
+      </button>
+    </div>
+
+    <div class="text-[11px] text-slate-500 font-mono pr-2">
+      Ready &bull; Standard PPF Cutoff Rule Simulation
+    </div>
+  </footer>
+
+  <!-- Notification Toast Modal -->
+  <div id="toastContainer" class="fixed bottom-10 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+  <script>
+    /* PPF & Simple Monthly Interest Calculator State */
+    const LOCAL_STORAGE_KEY = 'ppf_calc_excel_v2';
+
+    const defaultTodayStr = new Date().toISOString().split('T')[0];
+
+    let state = {
+      calculationDate: defaultTodayStr, // Target date for calculating interest
+      baseRate: 7.10,        // Standard Interest Rate
+      cutoffDay: 5,          // Standard PPF Cutoff Day
+      cutoffRule: 'strict',   // 'strict' (on/before 5th) or 'none'
+      fyStartMonth: 3,       // April
+      creditingMode: 'fy_end',// 'fy_end', 'monthly', 'simple_accum'
+      deposits: [],          // Array of { id, date, type, amount, customRate, note }
+      calculatedSchedule: [] // Cache calculated schedule for export
+    };
+
+    // --- Formatters for Indian Currency (INR ₹) ---
+    function formatINR(amount) {
+      if (amount === null || amount === undefined || isNaN(amount)) return '₹0.00';
+      const isNeg = amount < 0;
+      const absVal = Math.abs(amount);
+      const formatted = new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2
+      }).format(absVal);
+
+      return (isNeg ? '-₹' : '₹') + formatted;
+    }
+
+    function generateId() {
+      return 'id_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto px-3 py-2 rounded shadow-lg text-xs font-semibold text-white flex items-center gap-2 transition-all duration-300 transform translate-y-2 opacity-0 ${
+        type === 'success' ? 'bg-emerald-700' : type === 'error' ? 'bg-rose-700' : 'bg-slate-800'
+      }`;
+      toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check' : 'fa-circle-info'}"></i> ${msg}`;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    /* Helper function to parse Date string YYYY-MM-DD */
+    function parseLocalDate(dateStr) {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          return new Date(y, m, d);
+        }
+      }
+      return new Date();
+    }
+
+    function formatMonthYear(year, monthIndex) {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${months[monthIndex]} ${year}`;
+    }
+
+    /* Get applicable interest rate */
+    function getRateForMonth(year, monthIndex) {
+      return state.baseRate;
+    }
+
+    /* 
+      Core Engine: Monthly Interest Calculation up to Calculation Date
+    */
+    function recalculateAll(renderLedger = true) {
+      // 1. Sort deposits chronologically
+      state.deposits.sort((a, b) => a.date.localeCompare(b.date));
+
+      // Update Cutoff Labels
+      document.querySelectorAll('.cutoffLabel').forEach(el => el.textContent = state.cutoffDay);
+
+      if (state.deposits.length === 0) {
+        if (renderLedger) renderLedgerTable();
+        renderEmptySchedule();
+        updateKPIs(0, 0, 0, 0);
+        state.calculatedSchedule = [];
+        return;
+      }
+
+      // First transaction date
+      const firstTxDate = parseLocalDate(state.deposits[0].date);
+      const startYear = firstTxDate.getFullYear();
+      const startMonth = firstTxDate.getMonth();
+
+      // Calculation Target Date
+      const targetDate = parseLocalDate(state.calculationDate || defaultTodayStr);
+      const targetYear = targetDate.getFullYear();
+      const targetMonth = targetDate.getMonth();
+
+      // Ensure target date is at least equal to or after first transaction month
+      let endYear = targetYear;
+      let endMonth = targetMonth;
+      if (endYear < startYear || (endYear === startYear && endMonth < startMonth)) {
+        endYear = startYear;
+        endMonth = startMonth;
+      }
+
+      // Generate Month-by-Month Schedule
+      let monthlySchedule = [];
+      let currentYear = startYear;
+      let currentMonth = startMonth;
+
+      let openingBalance = 0;
+      let totalDepositsAccum = 0;
+      let totalInterestAccum = 0;
+      let fyInterestAccum = 0;
+
+      while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+        
+        // Find transactions in this calendar month
+        const txsInMonth = state.deposits.filter(tx => {
+          const d = parseLocalDate(tx.date);
+          return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        });
+
+        let eligibleDepositsThisMonth = 0;
+        let shiftedDepositsThisMonth = 0;
+        let withdrawalsThisMonth = 0;
+
+        txsInMonth.forEach(tx => {
+          const txDay = parseLocalDate(tx.date).getDate();
+          if (tx.type === 'deposit') {
+            totalDepositsAccum += tx.amount;
+
+            if (state.cutoffRule === 'strict' && txDay > state.cutoffDay) {
+              shiftedDepositsThisMonth += tx.amount;
+            } else {
+              eligibleDepositsThisMonth += tx.amount;
+            }
+          } else if (tx.type === 'withdrawal') {
+            withdrawalsThisMonth += tx.amount;
+          }
+        });
+
+        // Interest is calculated on Opening Balance + Eligible Deposits (<= Cutoff Day) - Withdrawals
+        const interestEligibleBalance = Math.max(0, openingBalance + eligibleDepositsThisMonth - withdrawalsThisMonth);
+        const monthlyRate = getRateForMonth(currentYear, currentMonth);
+
+        // Simple Monthly Interest Formula = (P * R / 100) / 12
+        const monthlyInterest = (interestEligibleBalance * (monthlyRate / 100)) / 12;
+        
+        fyInterestAccum += monthlyInterest;
+        totalInterestAccum += monthlyInterest;
+
+        // Closing Balance includes all deposits made in this month (eligible + shifted)
+        let closingBalance = 0;
+        if (state.creditingMode === 'monthly') {
+          closingBalance = openingBalance + eligibleDepositsThisMonth + shiftedDepositsThisMonth - withdrawalsThisMonth + monthlyInterest;
+        } else {
+          closingBalance = openingBalance + eligibleDepositsThisMonth + shiftedDepositsThisMonth - withdrawalsThisMonth;
+        }
+
+        monthlySchedule.push({
+          year: currentYear,
+          month: currentMonth,
+          monthLabel: formatMonthYear(currentYear, currentMonth),
+          openingBalance,
+          eligibleDeposits: eligibleDepositsThisMonth,
+          shiftedDeposits: shiftedDepositsThisMonth,
+          withdrawals: withdrawalsThisMonth,
+          interestEligibleBalance,
+          monthlyRate,
+          monthlyInterest,
+          closingBalance,
+          cumulativeInterest: totalInterestAccum
+        });
+
+        // Carry forward Closing Balance as Opening Balance for next month
+        openingBalance = closingBalance;
+
+        // Check FY End for crediting mode (Annual Credit at FY End)
+        const isFYEnd = (state.fyStartMonth === 3 && currentMonth === 2) || (state.fyStartMonth === 0 && currentMonth === 11);
+        if (isFYEnd && state.creditingMode === 'fy_end') {
+          openingBalance += fyInterestAccum;
+          fyInterestAccum = 0;
+        }
+
+        // Increment Month
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+      }
+
+      state.calculatedSchedule = monthlySchedule;
+
+      if (renderLedger) {
+        renderLedgerTable();
+      }
+      renderScheduleTable(monthlySchedule);
+      updateKPIs(totalDepositsAccum, totalInterestAccum, openingBalance, monthlySchedule.length);
+    }
+
+    function renderLedgerTable() {
+      const tbody = document.getElementById('ledgerTableBody');
+      const emptyMsg = document.getElementById('emptyLedgerMessage');
+      tbody.innerHTML = '';
+
+      if (state.deposits.length === 0) {
+        emptyMsg.classList.remove('hidden');
+        return;
+      }
+      emptyMsg.classList.add('hidden');
+
+      state.deposits.forEach((tx, idx) => {
+        const d = parseLocalDate(tx.date);
+        const day = d.getDate();
+        const isCutoffQualified = day <= state.cutoffDay;
+
+        const tr = document.createElement('tr');
+        tr.className = 'excel-row text-xs';
+        tr.innerHTML = `
+          <td class="text-center font-bold text-slate-400 select-none">${idx + 1}</td>
+          <td>
+            <input type="date" value="${tx.date}" oninput="updateTxFieldSilent('${tx.id}', 'date', this.value)" onchange="updateTxFieldAndCalculate('${tx.id}', 'date', this.value)" class="excel-input font-mono">
+          </td>
+          <td>
+            <select onchange="updateTxFieldAndCalculate('${tx.id}', 'type', this.value)" class="excel-input font-sans">
+              <option value="deposit" ${tx.type === 'deposit' ? 'selected' : ''}>Deposit (+)</option>
+              <option value="withdrawal" ${tx.type === 'withdrawal' ? 'selected' : ''}>Withdrawal (-)</option>
+            </select>
+          </td>
+          <td class="text-right">
+            <input type="number" step="100" value="${tx.amount}" oninput="updateTxFieldSilent('${tx.id}', 'amount', parseFloat(this.value) || 0)" onchange="updateTxFieldAndCalculate('${tx.id}', 'amount', parseFloat(this.value) || 0)" class="excel-input font-mono text-right font-bold text-slate-800">
+          </td>
+          <td class="text-center font-sans">
+            ${
+              tx.type === 'withdrawal' 
+                ? '<span class="text-slate-400">-</span>' 
+                : isCutoffQualified 
+                  ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-semibold" title="Deposited on day ${day} (<= ${state.cutoffDay}th): Earns interest this month">Eligible (≤ ${state.cutoffDay}th)</span>`
+                  : `<span class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-semibold" title="Deposited on day ${day} (> ${state.cutoffDay}th): Shifted to next month">Next Month (> ${state.cutoffDay}th)</span>`
+            }
+          </td>
+          <td class="text-center">
+            <input type="number" step="0.1" placeholder="${state.baseRate}%" value="${tx.customRate || ''}" oninput="updateTxFieldSilent('${tx.id}', 'customRate', this.value ? parseFloat(this.value) : null)" onchange="updateTxFieldAndCalculate('${tx.id}', 'customRate', this.value ? parseFloat(this.value) : null)" class="excel-input font-mono text-center">
+          </td>
+          <td>
+            <input type="text" placeholder="e.g. Monthly PPF Deposit" value="${tx.note || ''}" oninput="updateTxFieldSilent('${tx.id}', 'note', this.value)" onchange="updateTxFieldSilent('${tx.id}', 'note', this.value)" class="excel-input font-sans">
+          </td>
+          <td class="text-center">
+            <button onclick="deleteTx('${tx.id}')" class="text-slate-400 hover:text-rose-600 transition p-1" title="Delete Row">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderScheduleTable(schedule) {
+      const tbody = document.getElementById('scheduleTableBody');
+      const countEl = document.getElementById('scheduleSummaryCount');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!schedule || schedule.length === 0) {
+        renderEmptySchedule();
+        return;
+      }
+
+      if (countEl) {
+        countEl.textContent = `${schedule.length} Month${schedule.length > 1 ? 's' : ''} Generated`;
+      }
+
+      schedule.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'excel-row text-xs';
+        tr.innerHTML = `
+          <td class="text-center font-bold text-slate-400 select-none">${idx + 1}</td>
+          <td class="font-bold text-slate-700">${row.monthLabel}</td>
+          <td class="text-right">${formatINR(row.openingBalance)}</td>
+          <td class="text-right text-emerald-700 font-medium">${row.eligibleDeposits > 0 ? '+' + formatINR(row.eligibleDeposits) : '-'}</td>
+          <td class="text-right text-amber-700 font-medium">${row.shiftedDeposits > 0 ? '+' + formatINR(row.shiftedDeposits) : '-'}</td>
+          <td class="text-right text-rose-700 font-medium">${row.withdrawals > 0 ? '-' + formatINR(row.withdrawals) : '-'}</td>
+          <td class="text-right bg-emerald-50/50 font-semibold text-slate-800">${formatINR(row.interestEligibleBalance)}</td>
+          <td class="text-center font-mono">${row.monthlyRate.toFixed(2)}%</td>
+          <td class="text-right text-emerald-700 font-bold">${formatINR(row.monthlyInterest)}</td>
+          <td class="text-right font-bold text-slate-800">${formatINR(row.closingBalance)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderEmptySchedule() {
+      const tbody = document.getElementById('scheduleTableBody');
+      const countEl = document.getElementById('scheduleSummaryCount');
+      if (countEl) countEl.textContent = '0 Months Generated';
+      if (!tbody) return;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" class="text-center py-8 text-slate-400 text-xs font-sans">
+            <i class="fa-solid fa-calendar-xmark text-2xl mb-1 text-slate-300"></i>
+            <div>No schedule available. Add deposit entries to compute monthly interest.</div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateKPIs(totalDeposits, totalInterest, maturityBalance, activeMonths) {
+      const totalDepEl = document.getElementById('kpiTotalDeposits');
+      const totalIntEl = document.getElementById('kpiTotalInterest');
+      const maturityEl = document.getElementById('kpiMaturityBalance');
+      const monthsEl = document.getElementById('kpiActiveMonths');
+      const yieldEl = document.getElementById('kpiMonthlyYield');
+      const roiEl = document.getElementById('kpiROI');
+
+      if (totalDepEl) totalDepEl.textContent = formatINR(totalDeposits);
+      if (totalIntEl) totalIntEl.textContent = formatINR(totalInterest);
+      if (maturityEl) maturityEl.textContent = formatINR(maturityBalance);
+      if (monthsEl) monthsEl.textContent = `${activeMonths} Month${activeMonths !== 1 ? 's' : ''}`;
+
+      if (totalDeposits > 0) {
+        const roi = (totalInterest / totalDeposits) * 100;
+        if (roiEl) roiEl.textContent = `+${roi.toFixed(2)}%`;
+
+        if (activeMonths > 0) {
+          const avgMonthlyYield = (roi / activeMonths);
+          if (yieldEl) yieldEl.textContent = `${avgMonthlyYield.toFixed(2)}%/mo`;
+        } else {
+          if (yieldEl) yieldEl.textContent = '0.00%';
+        }
+      } else {
+        if (roiEl) roiEl.textContent = '+0.00%';
+        if (yieldEl) yieldEl.textContent = '0.00%';
+      }
+    }
+
+    /* CRUD Operations for Ledger Rows - Smooth typing support */
+    function updateTxFieldSilent(id, field, value) {
+      const tx = state.deposits.find(d => d.id === id);
+      if (tx) {
+        tx[field] = value;
+        saveState();
+      }
+    }
+
+    function updateTxFieldAndCalculate(id, field, value) {
+      const tx = state.deposits.find(d => d.id === id);
+      if (tx) {
+        tx[field] = value;
+        saveState();
+        recalculateAll(false); // Do not rebuild ledger DOM while user is interacting with inputs
+      }
+    }
+
+    function deleteTx(id) {
+      state.deposits = state.deposits.filter(d => d.id !== id);
+      saveState();
+      recalculateAll(true);
+      showToast('Deposit row removed');
+    }
+
+    /* State Management & Persistence */
+    function saveState() {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.warn('LocalStorage save failed:', e);
+      }
+    }
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (saved) {
+          state = { ...state, ...JSON.parse(saved) };
+          if (!state.calculationDate) state.calculationDate = defaultTodayStr;
+        } else {
+          loadDemoData();
+        }
+      } catch (e) {
+        loadDemoData();
+      }
+    }
+
+    function loadDemoData() {
+      state.calculationDate = defaultTodayStr;
+      state.baseRate = 7.10;
+      state.cutoffDay = 5;
+      state.cutoffRule = 'strict';
+      state.fyStartMonth = 3;
+      state.creditingMode = 'fy_end';
+
+      // Exactly 1 initial deposit row on load
+      state.deposits = [
+        { id: generateId(), date: defaultTodayStr, type: 'deposit', amount: 12500, customRate: null, note: 'Initial PPF Contribution' }
+      ];
+
+      syncInputsWithState();
+      recalculateAll();
+    }
+
+    function syncInputsWithState() {
+      document.getElementById('inputCalculationDate').value = state.calculationDate || defaultTodayStr;
+      document.getElementById('inputBaseRate').value = state.baseRate;
+      document.getElementById('inputCutoffDay').value = state.cutoffDay;
+      document.getElementById('selectCutoffRule').value = state.cutoffRule;
+      document.getElementById('selectCreditingMode').value = state.creditingMode;
+    }
+
+    /* Export Monthwise Schedule CSV Function */
+    function exportMonthlyScheduleCSV() {
+      if (!state.calculatedSchedule || state.calculatedSchedule.length === 0) {
+        showToast('No monthly interest data to export', 'error');
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Month,Month & Year,Opening Principal (INR),Eligible Deposits (<= " + state.cutoffDay + "th),Shifted Deposits (> " + state.cutoffDay + "th),Withdrawals (INR),Eligible Balance For SI (INR),Interest Rate (% p.a.),Monthly Interest Earned (INR),Closing Balance (INR)\n";
+
+      state.calculatedSchedule.forEach((m, idx) => {
+        csvContent += `${idx + 1},"${m.monthLabel}",${m.openingBalance.toFixed(2)},${m.eligibleDeposits.toFixed(2)},${m.shiftedDeposits.toFixed(2)},${m.withdrawals.toFixed(2)},${m.interestEligibleBalance.toFixed(2)},${m.monthlyRate.toFixed(2)},${m.monthlyInterest.toFixed(2)},${m.closingBalance.toFixed(2)}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `PPF_Monthly_Interest_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast('Exported Monthwise Schedule CSV', 'success');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      syncInputsWithState();
+      recalculateAll();
+
+      // Recalculate Sheet Button
+      const btnRecalc = document.getElementById('btnRecalculateSheet');
+      if (btnRecalc) {
+        btnRecalc.addEventListener('click', () => {
+          recalculateAll(true);
+          showToast('Sheet recalculated & updated!', 'success');
+        });
+      }
+
+      // Tab Switcher
+      document.querySelectorAll('.excel-tab').forEach(tabBtn => {
+        tabBtn.addEventListener('click', () => {
+          document.querySelectorAll('.excel-tab').forEach(b => b.classList.remove('active'));
+          tabBtn.classList.add('active');
+
+          const targetSheet = tabBtn.dataset.tab;
+          document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+          document.getElementById(targetSheet).classList.remove('hidden');
+        });
+      });
+
+      // Target Calculation Date
+      const calcDateInput = document.getElementById('inputCalculationDate');
+      calcDateInput.addEventListener('input', (e) => {
+        state.calculationDate = e.target.value;
+        saveState();
+        recalculateAll();
+      });
+      calcDateInput.addEventListener('change', (e) => {
+        state.calculationDate = e.target.value;
+        saveState();
+        recalculateAll();
+      });
+
+      // Base Rate Input
+      document.getElementById('inputBaseRate').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val >= 0) {
+          state.baseRate = val;
+          saveState();
+          recalculateAll();
+        }
+      });
+
+      // Cutoff Day Input
+      document.getElementById('inputCutoffDay').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (!isNaN(val) && val >= 1 && val <= 28) {
+          state.cutoffDay = val;
+          saveState();
+          recalculateAll();
+        }
+      });
+
+      document.getElementById('selectCutoffRule').addEventListener('change', (e) => {
+        state.cutoffRule = e.target.value;
+        saveState();
+        recalculateAll();
+      });
+
+      document.getElementById('selectCreditingMode').addEventListener('change', (e) => {
+        state.creditingMode = e.target.value;
+        saveState();
+        recalculateAll();
+      });
+
+      // Add Deposit Row Button
+      document.getElementById('btnAddRow').addEventListener('click', () => {
+        const dateStr = state.calculationDate || defaultTodayStr;
+        state.deposits.push({
+          id: generateId(),
+          date: dateStr,
+          type: 'deposit',
+          amount: 5000,
+          customRate: null,
+          note: 'Regular Deposit'
+        });
+        saveState();
+        recalculateAll();
+        showToast('New deposit row added');
+      });
+
+      // Clear Rows Button
+      document.getElementById('btnClearAllLedger').addEventListener('click', () => {
+        if (state.deposits.length === 0) return;
+        state.deposits = [];
+        saveState();
+        recalculateAll();
+        showToast('Ledger cleared');
+      });
+
+      // Reset Button
+      document.getElementById('btnReset').addEventListener('click', () => {
+        loadDemoData();
+        showToast('Calculator reset', 'info');
+      });
+
+      // CSV Export - Deposit Ledger
+      document.getElementById('btnExportCSV').addEventListener('click', () => {
+        if (state.deposits.length === 0) {
+          showToast('No deposit data to export', 'error');
+          return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Date,Type,Amount (INR),Cutoff Eligibility,Note\n";
+
+        state.deposits.forEach(tx => {
+          const day = parseLocalDate(tx.date).getDate();
+          const elig = day <= state.cutoffDay ? "Eligible Current Month" : "Shifted Next Month";
+          csvContent += `"${tx.date}","${tx.type}",${tx.amount},"${elig}","${tx.note || ''}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `PPF_Deposit_Ledger_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showToast('Exported Ledger CSV', 'success');
+      });
+
+      // CSV Export - Monthly Schedule
+      document.getElementById('btnExportMonthlyCSV').addEventListener('click', exportMonthlyScheduleCSV);
+      const btnInner = document.getElementById('btnExportMonthlySheetInner');
+      if (btnInner) {
+        btnInner.addEventListener('click', exportMonthlyScheduleCSV);
+      }
+    });
+  </script>
+</body>
+</html>
