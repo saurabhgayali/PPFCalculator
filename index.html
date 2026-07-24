@@ -147,14 +147,37 @@
         <input type="date" id="inputCalculationDate" class="excel-input font-mono font-bold text-slate-900 bg-white border-amber-300">
       </div>
 
-      <!-- Default Interest Rate -->
+      <!-- Interest Rate Type Toggle -->
       <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded border border-slate-200">
+        <label class="font-medium text-slate-600 whitespace-nowrap">
+          <i class="fa-solid fa-percent text-emerald-700 mr-1"></i>Interest Rate:
+        </label>
+        <div class="flex items-center gap-1 flex-1">
+          <button id="btnRateTypeFixed" class="rate-type-btn active px-3 py-1 rounded text-xs font-semibold bg-emerald-700 text-white transition" data-type="fixed">
+            Fixed
+          </button>
+          <button id="btnRateTypeVariable" class="rate-type-btn px-3 py-1 rounded text-xs font-semibold bg-slate-300 text-slate-700 hover:bg-slate-400 transition" data-type="variable">
+            Variable
+          </button>
+        </div>
+      </div>
+
+      <!-- Fixed Rate Input (shown when fixed rate is selected) -->
+      <div id="fixedRateContainer" class="flex items-center gap-2 bg-slate-50 p-1.5 rounded border border-slate-200">
         <label for="inputBaseRate" class="font-medium text-slate-600 whitespace-nowrap">
-          <i class="fa-solid fa-percent text-emerald-700 mr-1"></i>Default Rate (p.a.):
+          <i class="fa-solid fa-input-numeric text-emerald-700 mr-1"></i>Rate Value (p.a.):
         </label>
         <div class="flex items-center gap-1 w-full">
           <input type="number" id="inputBaseRate" step="0.05" min="0" max="30" value="7.10" class="excel-input font-semibold text-slate-900 text-right bg-white border-slate-300">
           <span class="font-bold text-slate-500">%</span>
+        </div>
+      </div>
+
+      <!-- Variable Rate Message (shown when variable rate is selected) -->
+      <div id="variableRateContainer" class="hidden flex items-center gap-2 bg-blue-50 p-1.5 rounded border border-blue-200">
+        <i class="fa-solid fa-info-circle text-blue-600 text-lg"></i>
+        <div class="flex-1">
+          <p class="text-xs font-medium text-blue-900">Variable interest rate selected. Edit rate changes in the <strong>VIR</strong> tab.</p>
         </div>
       </div>
 
@@ -332,6 +355,47 @@
       </div>
     </section>
 
+    <!-- SHEET 3: VARIABLE INTEREST RATE (VIR) TAB -->
+    <section id="sheetVIR" class="flex-1 flex flex-col overflow-hidden hidden">
+      <div class="bg-slate-100 border-b border-slate-300 px-4 py-2 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-700 flex items-center gap-1">
+            <i class="fa-solid fa-chart-line text-emerald-700"></i> Variable Interest Rates (VIR)
+          </span>
+          <span class="text-slate-400">|</span>
+          <span class="text-slate-500">Track interest rate changes by effective date. Rates apply from the 1st of the specified month onwards.</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnAddVIRRow" class="bg-slate-700 hover:bg-slate-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1 shadow-sm">
+            <i class="fa-solid fa-plus text-xs"></i> Add Rate Entry
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-auto p-4 bg-slate-50">
+        <div class="bg-white rounded border border-slate-300 shadow-sm overflow-hidden">
+          <table class="excel-table w-full text-left font-mono">
+            <thead>
+              <tr class="text-xs">
+                <th class="w-10 text-center py-2 px-1">#</th>
+                <th class="w-48 py-2 px-2">Effective Date (1st of Month)</th>
+                <th class="w-40 py-2 px-2 text-right">Interest Rate (% p.a.)</th>
+                <th class="py-2 px-2">Notes / Description</th>
+                <th class="w-16 text-center py-2 px-1">Action</th>
+              </tr>
+            </thead>
+            <tbody id="virTableBody">
+              <!-- Dynamic VIR rows populated by JS -->
+            </tbody>
+          </table>
+          <div id="emptyVIRMessage" class="hidden text-center py-12 bg-white">
+            <i class="fa-solid fa-table text-3xl text-slate-300 mb-2"></i>
+            <p class="text-slate-500 text-xs font-sans">No variable rates added yet. Click <strong>"Add Rate Entry"</strong> to add interest rate change records.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Bottom Excel Sheet Tabs Footer -->
@@ -342,6 +406,9 @@
       </button>
       <button data-tab="sheetSchedule" class="excel-tab px-4 py-1.5 border border-slate-300 rounded-t bg-slate-100 hover:bg-white transition flex items-center gap-1.5 text-xs">
         <i class="fa-solid fa-table text-slate-600"></i> Monthly Interest Schedule
+      </button>
+      <button data-tab="sheetVIR" class="excel-tab px-4 py-1.5 border border-slate-300 rounded-t bg-slate-100 hover:bg-white transition flex items-center gap-1.5 text-xs">
+        <i class="fa-solid fa-chart-line text-slate-600"></i> VIR
       </button>
     </div>
 
@@ -367,7 +434,9 @@
       fyStartMonth: 3,       // April
       creditingMode: 'fy_end',// 'fy_end', 'monthly', 'simple_accum'
       deposits: [],          // Array of { id, date, type, amount, customRate, note }
-      calculatedSchedule: [] // Cache calculated schedule for export
+      calculatedSchedule: [],// Cache calculated schedule for export
+      rateType: 'fixed',     // 'fixed' or 'variable'
+      variableRates: []      // Array of { id, date, rate, note } for variable rates
     };
 
     // --- Formatters for Indian Currency (INR ₹) ---
@@ -424,7 +493,33 @@
 
     /* Get applicable interest rate */
     function getRateForMonth(year, monthIndex) {
-      return state.baseRate;
+      if (state.rateType === 'fixed') {
+        return state.baseRate;
+      } else {
+        // Variable rate: find the applicable rate based on the month
+        // Rates are stored with effective dates (1st of month)
+        // We need to find the rate that is effective on or before this month
+        
+        const targetDate = new Date(year, monthIndex, 1); // 1st of the target month
+        let applicableRate = state.baseRate; // fallback to baseRate
+        
+        // Sort rates by date in descending order to find the most recent applicable rate
+        const sortedRates = [...state.variableRates].sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          return dateB - dateA;
+        });
+        
+        for (const rateEntry of sortedRates) {
+          const rateEffectiveDate = new Date(rateEntry.date);
+          if (rateEffectiveDate <= targetDate) {
+            applicableRate = parseFloat(rateEntry.rate);
+            break;
+          }
+        }
+        
+        return applicableRate;
+      }
     }
 
     /* 
@@ -720,6 +815,87 @@
       showToast('Deposit row removed');
     }
 
+    /* VIR (Variable Interest Rate) Table Rendering & CRUD */
+    function renderVIRTable() {
+      const tbody = document.getElementById('virTableBody');
+      const emptyMsg = document.getElementById('emptyVIRMessage');
+      
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (state.variableRates.length === 0) {
+        emptyMsg.classList.remove('hidden');
+        return;
+      }
+      emptyMsg.classList.add('hidden');
+
+      // Sort rates by date for display
+      const sortedRates = [...state.variableRates].sort((a, b) => {
+        return new Date(a.date) - new Date(b.date);
+      });
+
+      sortedRates.forEach((rate, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'excel-row text-xs';
+        tr.innerHTML = `
+          <td class="text-center font-bold text-slate-400 select-none">${idx + 1}</td>
+          <td>
+            <input type="date" value="${rate.date}" oninput="updateVIRFieldSilent('${rate.id}', 'date', this.value)" onchange="updateVIRFieldAndCalculate('${rate.id}', 'date', this.value)" class="excel-input font-mono">
+          </td>
+          <td class="text-right">
+            <input type="number" step="0.05" min="0" max="30" value="${rate.rate}" oninput="updateVIRFieldSilent('${rate.id}', 'rate', parseFloat(this.value) || 0)" onchange="updateVIRFieldAndCalculate('${rate.id}', 'rate', parseFloat(this.value) || 0)" class="excel-input font-mono text-right font-bold text-slate-800">
+          </td>
+          <td>
+            <input type="text" placeholder="e.g. Rate changed by RBI" value="${rate.note || ''}" oninput="updateVIRFieldSilent('${rate.id}', 'note', this.value)" onchange="updateVIRFieldSilent('${rate.id}', 'note', this.value)" class="excel-input font-sans">
+          </td>
+          <td class="text-center">
+            <button onclick="deleteVIRRate('${rate.id}')" class="text-slate-400 hover:text-rose-600 transition p-1" title="Delete Rate Entry">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateVIRFieldSilent(id, field, value) {
+      const rate = state.variableRates.find(r => r.id === id);
+      if (rate) {
+        rate[field] = value;
+        saveState();
+      }
+    }
+
+    function updateVIRFieldAndCalculate(id, field, value) {
+      const rate = state.variableRates.find(r => r.id === id);
+      if (rate) {
+        rate[field] = value;
+        saveState();
+        recalculateAll(false); // Do not rebuild tables while user is interacting
+      }
+    }
+
+    function deleteVIRRate(id) {
+      state.variableRates = state.variableRates.filter(r => r.id !== id);
+      saveState();
+      renderVIRTable();
+      recalculateAll(false);
+      showToast('Interest rate entry removed');
+    }
+
+    function addVIRRow() {
+      const newRate = {
+        id: generateId(),
+        date: defaultTodayStr,
+        rate: state.baseRate,
+        note: ''
+      };
+      state.variableRates.push(newRate);
+      saveState();
+      renderVIRTable();
+      showToast('New rate entry added');
+    }
+
     /* State Management & Persistence */
     function saveState() {
       try {
@@ -750,6 +926,8 @@
       state.cutoffRule = 'strict';
       state.fyStartMonth = 3;
       state.creditingMode = 'fy_end';
+      state.rateType = 'fixed';
+      state.variableRates = [];
 
       // Exactly 1 initial deposit row on load
       state.deposits = [
@@ -766,6 +944,39 @@
       document.getElementById('inputCutoffDay').value = state.cutoffDay;
       document.getElementById('selectCutoffRule').value = state.cutoffRule;
       document.getElementById('selectCreditingMode').value = state.creditingMode;
+      updateRateTypeUI();
+      renderVIRTable();
+    }
+
+    function updateRateTypeUI() {
+      const btnFixed = document.getElementById('btnRateTypeFixed');
+      const btnVariable = document.getElementById('btnRateTypeVariable');
+      const fixedRateContainer = document.getElementById('fixedRateContainer');
+      const variableRateContainer = document.getElementById('variableRateContainer');
+
+      if (state.rateType === 'fixed') {
+        if (btnFixed) {
+          btnFixed.classList.remove('bg-slate-300', 'text-slate-700', 'hover:bg-slate-400');
+          btnFixed.classList.add('bg-emerald-700', 'text-white');
+        }
+        if (btnVariable) {
+          btnVariable.classList.remove('bg-emerald-700', 'text-white');
+          btnVariable.classList.add('bg-slate-300', 'text-slate-700', 'hover:bg-slate-400');
+        }
+        if (fixedRateContainer) fixedRateContainer.classList.remove('hidden');
+        if (variableRateContainer) variableRateContainer.classList.add('hidden');
+      } else {
+        if (btnFixed) {
+          btnFixed.classList.remove('bg-emerald-700', 'text-white');
+          btnFixed.classList.add('bg-slate-300', 'text-slate-700', 'hover:bg-slate-400');
+        }
+        if (btnVariable) {
+          btnVariable.classList.remove('bg-slate-300', 'text-slate-700', 'hover:bg-slate-400');
+          btnVariable.classList.add('bg-emerald-700', 'text-white');
+        }
+        if (fixedRateContainer) fixedRateContainer.classList.add('hidden');
+        if (variableRateContainer) variableRateContainer.classList.remove('hidden');
+      }
     }
 
     /* Export Monthwise Schedule CSV Function */
@@ -840,6 +1051,34 @@
           recalculateAll();
         }
       });
+
+      // Rate Type Toggle Buttons (Fixed vs Variable)
+      const btnRateTypeFixed = document.getElementById('btnRateTypeFixed');
+      const btnRateTypeVariable = document.getElementById('btnRateTypeVariable');
+      
+      if (btnRateTypeFixed) {
+        btnRateTypeFixed.addEventListener('click', () => {
+          state.rateType = 'fixed';
+          saveState();
+          updateRateTypeUI();
+          recalculateAll();
+        });
+      }
+      
+      if (btnRateTypeVariable) {
+        btnRateTypeVariable.addEventListener('click', () => {
+          state.rateType = 'variable';
+          saveState();
+          updateRateTypeUI();
+          recalculateAll();
+        });
+      }
+
+      // Add VIR Row Button
+      const btnAddVIRRow = document.getElementById('btnAddVIRRow');
+      if (btnAddVIRRow) {
+        btnAddVIRRow.addEventListener('click', addVIRRow);
+      }
 
       // Cutoff Day Input
       document.getElementById('inputCutoffDay').addEventListener('input', (e) => {
