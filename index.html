@@ -138,7 +138,7 @@
       <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
         <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
       </button>
-      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" aria-label="Select JSON file to import app data">
+      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" aria-label="Import application data including deposits, rates, and settings from JSON file">
       <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Reset
       </button>
@@ -1091,6 +1091,7 @@
             }
             
             // Validate structure - whitelist approach with range validation
+            // Base rate 0-30% covers historical PPF rates (typically 7-8%) and reasonable future rates
             const isValidBaseRate = (rate) => typeof rate === 'number' && Number.isFinite(rate) && rate >= 0 && rate <= 30;
             const isValidCutoffDay = (day) => typeof day === 'number' && Number.isFinite(day) && day >= 1 && day <= 31;
             const isValidFYMonth = (month) => typeof month === 'number' && Number.isFinite(month) && month >= 0 && month <= 11;
@@ -1124,7 +1125,7 @@
       
       reader.onerror = function() {
         const errorDetails = reader.error?.message ?? reader.error?.name ?? 'Unknown error';
-        showToast('Failed to read file: ' + errorDetails, 'error');
+        showToast('Failed to read file: ' + errorDetails + '. Please ensure the file is accessible and not corrupted.', 'error');
       };
       
       reader.readAsText(file);
