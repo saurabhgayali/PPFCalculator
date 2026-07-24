@@ -128,10 +128,10 @@
       <button id="btnExportMonthlyCSV" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded border border-emerald-600 transition flex items-center gap-1.5" title="Download Monthwise Interest Schedule">
         <i class="fa-solid fa-file-excel text-emerald-300"></i> Export Monthly Sheet
       </button>
-      <button id="btnExportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Export all app data and parameters as JSON" aria-label="Export all app data and parameters as JSON file">
+      <button id="btnExportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Export all app data and parameters as JSON">
         <i class="fa-solid fa-file-code text-blue-300"></i> Export JSON
       </button>
-      <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file" aria-label="Import app data and parameters from previously exported JSON file">
+      <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
         <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
       </button>
       <input type="file" id="jsonImportInput" accept=".json" style="display: none;">
@@ -1095,7 +1095,7 @@
               cutoffRule: (importedAppData.cutoffRule === 'strict' || importedAppData.cutoffRule === 'none') ? importedAppData.cutoffRule : state.cutoffRule,
               fyStartMonth: typeof importedAppData.fyStartMonth === 'number' ? importedAppData.fyStartMonth : state.fyStartMonth,
               creditingMode: (importedAppData.creditingMode === 'fy_end' || importedAppData.creditingMode === 'monthly' || importedAppData.creditingMode === 'simple_accum') ? importedAppData.creditingMode : state.creditingMode,
-              deposits: validatedDeposits.length > 0 ? validatedDeposits : state.deposits,
+              deposits: Array.isArray(importedAppData.deposits) ? validatedDeposits : state.deposits,
               rateType: (importedAppData.rateType === 'fixed' || importedAppData.rateType === 'variable') ? importedAppData.rateType : state.rateType,
               variableRates: validatedRates,
               calculatedSchedule: []
