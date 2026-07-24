@@ -1119,8 +1119,8 @@
       };
       
       reader.onerror = function() {
-        const errorMsg = reader.error ? reader.error.name : 'Unknown error';
-        showToast('Failed to read file (' + errorMsg + '). Please try again.', 'error');
+        const errorDetails = reader.error ? (reader.error.message || reader.error.name) : 'Unknown error';
+        showToast('Failed to read file: ' + errorDetails, 'error');
       };
       
       reader.readAsText(file);
