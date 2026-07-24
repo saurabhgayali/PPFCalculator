@@ -138,7 +138,7 @@
       <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
         <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
       </button>
-      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" tabindex="-1" aria-label="Import application data including deposits, rates, and settings from JSON file">
+      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" aria-label="Import application data including deposits, rates, and settings from JSON file">
       <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Reset
       </button>
@@ -465,6 +465,10 @@
 
     function generateId() {
       return 'id_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function getFormattedDate() {
+      return new Date().toISOString().split('T')[0];
     }
 
     function showToast(msg, type = 'info') {
@@ -1018,7 +1022,7 @@
 
     /* Export All App Data to JSON */
     function exportAppDataJSON() {
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = getFormattedDate();
       const jsonData = {
         exportDate: dateStr,
         appData: state
@@ -1126,7 +1130,7 @@
       };
       
       reader.onerror = function() {
-        const errorMsg = reader.error ? (reader.error.message || reader.error.name || 'Unknown error') : 'Unknown error';
+        const errorMsg = reader.error?.message || reader.error?.name || 'Unknown error';
         showToast('Failed to read file: ' + errorMsg + '. Please ensure the file is accessible and not corrupted.', 'error');
       };
       
