@@ -138,7 +138,7 @@
       <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
         <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
       </button>
-      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" aria-label="Import application data including deposits, rates, and settings from JSON file">
+      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" tabindex="-1" aria-label="Import application data including deposits, rates, and settings from JSON file">
       <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Reset
       </button>
@@ -1053,22 +1053,24 @@
             const importedAppData = importedData.appData;
             
             // Helper function to validate deposit objects
+            // Validates: id, date, type, amount, optional customRate (0-30%), and optional note
             const isValidDeposit = (d) => {
               return typeof d === 'object' && d !== null &&
                      typeof d.id === 'string' &&
                      typeof d.date === 'string' &&
                      (d.type === 'deposit' || d.type === 'withdrawal') &&
                      typeof d.amount === 'number' && Number.isFinite(d.amount) &&
-                     (d.customRate === null || (typeof d.customRate === 'number' && Number.isFinite(d.customRate))) &&
+                     (d.customRate === null || (typeof d.customRate === 'number' && Number.isFinite(d.customRate) && d.customRate >= 0 && d.customRate <= 30)) &&
                      (typeof d.note === 'string' || d.note === null);
             };
 
             // Helper function to validate rate objects
+            // Validates: id, date, rate (0-30% for financial reasonableness), and optional note
             const isValidRate = (r) => {
               return typeof r === 'object' && r !== null &&
                      typeof r.id === 'string' &&
                      typeof r.date === 'string' &&
-                     typeof r.rate === 'number' && Number.isFinite(r.rate) &&
+                     typeof r.rate === 'number' && Number.isFinite(r.rate) && r.rate >= 0 && r.rate <= 30 &&
                      (typeof r.note === 'string' || r.note === null);
             };
 
@@ -1124,8 +1126,8 @@
       };
       
       reader.onerror = function() {
-        const errorDetails = reader.error?.message ?? reader.error?.name ?? 'Unknown error';
-        showToast('Failed to read file: ' + errorDetails + '. Please ensure the file is accessible and not corrupted.', 'error');
+        const errorMsg = reader.error ? (reader.error.message || reader.error.name || 'Unknown error') : 'Unknown error';
+        showToast('Failed to read file: ' + errorMsg + '. Please ensure the file is accessible and not corrupted.', 'error');
       };
       
       reader.readAsText(file);
