@@ -100,6 +100,10 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+
+    .hidden-file-input {
+      display: none;
+    }
   </style>
 </head>
 <body class="min-h-full flex flex-col bg-slate-100 text-slate-800 antialiased selection:bg-emerald-200">
@@ -128,6 +132,13 @@
       <button id="btnExportMonthlyCSV" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded border border-emerald-600 transition flex items-center gap-1.5" title="Download Monthwise Interest Schedule">
         <i class="fa-solid fa-file-excel text-emerald-300"></i> Export Monthly Sheet
       </button>
+      <button id="btnExportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Export all app data and parameters as JSON">
+        <i class="fa-solid fa-file-code text-blue-300"></i> Export JSON
+      </button>
+      <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
+        <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
+      </button>
+      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input" aria-label="Import application data including deposits, rates, and settings from JSON file">
       <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Reset
       </button>
@@ -456,6 +467,10 @@
       return 'id_' + Math.random().toString(36).substr(2, 9);
     }
 
+    function getFormattedDate() {
+      return new Date().toISOString().split('T')[0];
+    }
+
     function showToast(msg, type = 'info') {
       const container = document.getElementById('toastContainer');
       const toast = document.createElement('div');
@@ -652,7 +667,9 @@
         renderLedgerTable();
       }
       renderScheduleTable(monthlySchedule);
-      updateKPIs(totalDepositsAccum, totalInterestAccum, openingBalance, monthlySchedule.length);
+      // Calculate actual maturity balance: deposits + all accumulated interest (including uncredited FY interest)
+      const maturityBalance = totalDepositsAccum + totalInterestAccum;
+      updateKPIs(totalDepositsAccum, totalInterestAccum, maturityBalance, monthlySchedule.length);
     }
 
     function renderLedgerTable() {
@@ -1003,6 +1020,123 @@
       showToast('Exported Monthwise Schedule CSV', 'success');
     }
 
+    /* Export All App Data to JSON */
+    function exportAppDataJSON() {
+      const dateStr = getFormattedDate();
+      const jsonData = {
+        exportDate: dateStr,
+        appData: state
+      };
+
+      const dataStr = JSON.stringify(jsonData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `PPF_Calculator_Export_${dateStr}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast('Exported all app data to JSON', 'success');
+    }
+
+    /* Import App Data from JSON */
+    function importAppDataJSON(file) {
+      if (!file) {
+        showToast('No file selected', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          
+          if (importedData.appData) {
+            const importedAppData = importedData.appData;
+            
+            // Helper function to validate deposit objects
+            // Validates: id, date, type, amount, optional customRate (0-30%), and optional note
+            const isValidDeposit = (d) => {
+              return typeof d === 'object' && d !== null &&
+                     typeof d.id === 'string' &&
+                     typeof d.date === 'string' &&
+                     (d.type === 'deposit' || d.type === 'withdrawal') &&
+                     typeof d.amount === 'number' && Number.isFinite(d.amount) &&
+                     (d.customRate === null || (typeof d.customRate === 'number' && Number.isFinite(d.customRate) && d.customRate >= 0 && d.customRate <= 30)) &&
+                     (typeof d.note === 'string' || d.note === null);
+            };
+
+            // Helper function to validate rate objects
+            // Validates: id, date, rate (0-30% for financial reasonableness), and optional note
+            const isValidRate = (r) => {
+              return typeof r === 'object' && r !== null &&
+                     typeof r.id === 'string' &&
+                     typeof r.date === 'string' &&
+                     typeof r.rate === 'number' && Number.isFinite(r.rate) && r.rate >= 0 && r.rate <= 30 &&
+                     (typeof r.note === 'string' || r.note === null);
+            };
+
+            // Validate deposits array
+            let validatedDeposits = [];
+            if (Array.isArray(importedAppData.deposits)) {
+              validatedDeposits = importedAppData.deposits.filter(isValidDeposit);
+              if (validatedDeposits.length !== importedAppData.deposits.length) {
+                console.warn('Some invalid deposit entries were filtered out during import');
+              }
+            }
+
+            // Validate variableRates array
+            let validatedRates = [];
+            if (Array.isArray(importedAppData.variableRates)) {
+              validatedRates = importedAppData.variableRates.filter(isValidRate);
+              if (validatedRates.length !== importedAppData.variableRates.length) {
+                console.warn('Some invalid rate entries were filtered out during import');
+              }
+            }
+            
+            // Validate structure - whitelist approach with range validation
+            // Base rate 0-30% covers historical PPF rates (typically 7-8%) and reasonable future rates
+            const isValidBaseRate = (rate) => typeof rate === 'number' && Number.isFinite(rate) && rate >= 0 && rate <= 30;
+            const isValidCutoffDay = (day) => typeof day === 'number' && Number.isFinite(day) && day >= 1 && day <= 31;
+            const isValidFYMonth = (month) => typeof month === 'number' && Number.isFinite(month) && month >= 0 && month <= 11;
+
+            const validatedData = {
+              calculationDate: typeof importedAppData.calculationDate === 'string' ? importedAppData.calculationDate : state.calculationDate,
+              baseRate: isValidBaseRate(importedAppData.baseRate) ? importedAppData.baseRate : state.baseRate,
+              cutoffDay: isValidCutoffDay(importedAppData.cutoffDay) ? importedAppData.cutoffDay : state.cutoffDay,
+              cutoffRule: (importedAppData.cutoffRule === 'strict' || importedAppData.cutoffRule === 'none') ? importedAppData.cutoffRule : state.cutoffRule,
+              fyStartMonth: isValidFYMonth(importedAppData.fyStartMonth) ? importedAppData.fyStartMonth : state.fyStartMonth,
+              creditingMode: (importedAppData.creditingMode === 'fy_end' || importedAppData.creditingMode === 'monthly' || importedAppData.creditingMode === 'simple_accum') ? importedAppData.creditingMode : state.creditingMode,
+              deposits: validatedDeposits,
+              rateType: (importedAppData.rateType === 'fixed' || importedAppData.rateType === 'variable') ? importedAppData.rateType : state.rateType,
+              variableRates: validatedRates,
+              calculatedSchedule: []
+            };
+            
+            // Restore validated data
+            state = validatedData;
+            saveState();
+            syncInputsWithState();
+            recalculateAll();
+            showToast('Successfully imported app data and parameters', 'success');
+          } else {
+            showToast('Invalid JSON format. Expected appData field.', 'error');
+          }
+        } catch (error) {
+          showToast('Failed to parse JSON file: ' + error.message, 'error');
+        }
+      };
+      
+      reader.onerror = function() {
+        const errorMsg = reader.error?.message || reader.error?.name || 'Unknown error';
+        showToast('Failed to read file: ' + errorMsg + '. Please ensure the file is accessible and not corrupted.', 'error');
+      };
+      
+      reader.readAsText(file);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       loadState();
       syncInputsWithState();
@@ -1164,6 +1298,35 @@
       const btnInner = document.getElementById('btnExportMonthlySheetInner');
       if (btnInner) {
         btnInner.addEventListener('click', exportMonthlyScheduleCSV);
+      }
+
+      // JSON Export Button
+      const btnExportJSON = document.getElementById('btnExportJSON');
+      if (btnExportJSON) {
+        btnExportJSON.addEventListener('click', exportAppDataJSON);
+      }
+
+      // JSON Import File Input
+      const importFileInput = document.getElementById('jsonImportInput');
+      if (importFileInput) {
+        importFileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            importAppDataJSON(e.target.files[0]);
+            // Reset the input so the same file can be imported again if needed
+            e.target.value = '';
+          }
+        });
+      }
+
+      // JSON Import Button (to trigger file input)
+      const btnImportJSON = document.getElementById('btnImportJSON');
+      if (btnImportJSON) {
+        btnImportJSON.addEventListener('click', () => {
+          const fileInput = document.getElementById('jsonImportInput');
+          if (fileInput) {
+            fileInput.click();
+          }
+        });
       }
     });
   </script>
