@@ -128,6 +128,13 @@
       <button id="btnExportMonthlyCSV" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded border border-emerald-600 transition flex items-center gap-1.5" title="Download Monthwise Interest Schedule">
         <i class="fa-solid fa-file-excel text-emerald-300"></i> Export Monthly Sheet
       </button>
+      <button id="btnExportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Export all app data and parameters as JSON">
+        <i class="fa-solid fa-file-code text-blue-300"></i> Export JSON
+      </button>
+      <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
+        <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
+      </button>
+      <input type="file" id="jsonImportInput" accept=".json" style="display: none;">
       <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Reset
       </button>
@@ -652,7 +659,9 @@
         renderLedgerTable();
       }
       renderScheduleTable(monthlySchedule);
-      updateKPIs(totalDepositsAccum, totalInterestAccum, openingBalance, monthlySchedule.length);
+      // Calculate actual maturity balance: deposits + all accumulated interest (including uncredited FY interest)
+      const maturityBalance = totalDepositsAccum + totalInterestAccum;
+      updateKPIs(totalDepositsAccum, totalInterestAccum, maturityBalance, monthlySchedule.length);
     }
 
     function renderLedgerTable() {
@@ -1003,6 +1012,55 @@
       showToast('Exported Monthwise Schedule CSV', 'success');
     }
 
+    /* Export All App Data to JSON */
+    function exportAppDataJSON() {
+      const jsonData = {
+        timestamp: new Date().toISOString(),
+        appData: state
+      };
+
+      const dataStr = JSON.stringify(jsonData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `PPF_Calculator_Export_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast('Exported all app data to JSON', 'success');
+    }
+
+    /* Import App Data from JSON */
+    function importAppDataJSON(file) {
+      if (!file) {
+        showToast('No file selected', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+           
+          if (importedData.appData) {
+            // Restore state from imported data
+            state = { ...state, ...importedData.appData };
+            saveState();
+            syncInputsWithState();
+            recalculateAll();
+            showToast('Successfully imported app data and parameters', 'success');
+          } else {
+            showToast('Invalid JSON format. Expected appData field.', 'error');
+          }
+        } catch (error) {
+          showToast('Failed to parse JSON file: ' + error.message, 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       loadState();
       syncInputsWithState();
@@ -1164,6 +1222,35 @@
       const btnInner = document.getElementById('btnExportMonthlySheetInner');
       if (btnInner) {
         btnInner.addEventListener('click', exportMonthlyScheduleCSV);
+      }
+
+      // JSON Export Button
+      const btnExportJSON = document.getElementById('btnExportJSON');
+      if (btnExportJSON) {
+        btnExportJSON.addEventListener('click', exportAppDataJSON);
+      }
+
+      // JSON Import File Input
+      const importFileInput = document.getElementById('jsonImportInput');
+      if (importFileInput) {
+        importFileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            importAppDataJSON(e.target.files[0]);
+            // Reset the input so the same file can be imported again if needed
+            e.target.value = '';
+          }
+        });
+      }
+
+      // JSON Import Button (to trigger file input)
+      const btnImportJSON = document.getElementById('btnImportJSON');
+      if (btnImportJSON) {
+        btnImportJSON.addEventListener('click', () => {
+          const fileInput = document.getElementById('jsonImportInput');
+          if (fileInput) {
+            fileInput.click();
+          }
+        });
       }
     });
   </script>
