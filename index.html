@@ -128,10 +128,10 @@
       <button id="btnExportMonthlyCSV" class="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded border border-emerald-600 transition flex items-center gap-1.5" title="Download Monthwise Interest Schedule">
         <i class="fa-solid fa-file-excel text-emerald-300"></i> Export Monthly Sheet
       </button>
-      <button id="btnExportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Export all app data and parameters as JSON">
+      <button id="btnExportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Export all app data and parameters as JSON" aria-label="Export all app data and parameters as JSON file">
         <i class="fa-solid fa-file-code text-blue-300"></i> Export JSON
       </button>
-      <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
+      <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file" aria-label="Import app data and parameters from previously exported JSON file">
         <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
       </button>
       <input type="file" id="jsonImportInput" accept=".json" style="display: none;">
@@ -1014,8 +1014,9 @@
 
     /* Export All App Data to JSON */
     function exportAppDataJSON() {
+      const timestamp = new Date().toISOString();
       const jsonData = {
-        timestamp: new Date().toISOString(),
+        exportTimestamp: timestamp,
         appData: state
       };
 
@@ -1023,8 +1024,9 @@
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
       const link = document.createElement("a");
+      const dateStr = timestamp.split('T')[0];
       link.setAttribute("href", url);
-      link.setAttribute("download", `PPF_Calculator_Export_${new Date().toISOString().split('T')[0]}.json`);
+      link.setAttribute("download", `PPF_Calculator_Export_${dateStr}.json`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1043,10 +1045,64 @@
       reader.onload = function(e) {
         try {
           const importedData = JSON.parse(e.target.result);
-           
+          
           if (importedData.appData) {
-            // Restore state from imported data
-            state = { ...state, ...importedData.appData };
+            const importedAppData = importedData.appData;
+            
+            // Helper function to validate deposit objects
+            const isValidDeposit = (d) => {
+              return typeof d === 'object' && d !== null &&
+                     typeof d.id === 'string' &&
+                     typeof d.date === 'string' &&
+                     (d.type === 'deposit' || d.type === 'withdrawal') &&
+                     typeof d.amount === 'number' &&
+                     (d.customRate === null || typeof d.customRate === 'number') &&
+                     (typeof d.note === 'string' || d.note === null);
+            };
+
+            // Helper function to validate rate objects
+            const isValidRate = (r) => {
+              return typeof r === 'object' && r !== null &&
+                     typeof r.id === 'string' &&
+                     typeof r.date === 'string' &&
+                     typeof r.rate === 'number' &&
+                     (typeof r.note === 'string' || r.note === null);
+            };
+
+            // Validate deposits array
+            let validatedDeposits = [];
+            if (Array.isArray(importedAppData.deposits)) {
+              validatedDeposits = importedAppData.deposits.filter(isValidDeposit);
+              if (validatedDeposits.length !== importedAppData.deposits.length) {
+                console.warn('Some invalid deposit entries were filtered out during import');
+              }
+            }
+
+            // Validate variableRates array
+            let validatedRates = [];
+            if (Array.isArray(importedAppData.variableRates)) {
+              validatedRates = importedAppData.variableRates.filter(isValidRate);
+              if (validatedRates.length !== importedAppData.variableRates.length) {
+                console.warn('Some invalid rate entries were filtered out during import');
+              }
+            }
+            
+            // Validate structure - whitelist approach
+            const validatedData = {
+              calculationDate: typeof importedAppData.calculationDate === 'string' ? importedAppData.calculationDate : state.calculationDate,
+              baseRate: typeof importedAppData.baseRate === 'number' ? importedAppData.baseRate : state.baseRate,
+              cutoffDay: typeof importedAppData.cutoffDay === 'number' ? importedAppData.cutoffDay : state.cutoffDay,
+              cutoffRule: (importedAppData.cutoffRule === 'strict' || importedAppData.cutoffRule === 'none') ? importedAppData.cutoffRule : state.cutoffRule,
+              fyStartMonth: typeof importedAppData.fyStartMonth === 'number' ? importedAppData.fyStartMonth : state.fyStartMonth,
+              creditingMode: (importedAppData.creditingMode === 'fy_end' || importedAppData.creditingMode === 'monthly' || importedAppData.creditingMode === 'simple_accum') ? importedAppData.creditingMode : state.creditingMode,
+              deposits: validatedDeposits.length > 0 ? validatedDeposits : state.deposits,
+              rateType: (importedAppData.rateType === 'fixed' || importedAppData.rateType === 'variable') ? importedAppData.rateType : state.rateType,
+              variableRates: validatedRates,
+              calculatedSchedule: []
+            };
+            
+            // Restore validated data
+            state = validatedData;
             saveState();
             syncInputsWithState();
             recalculateAll();
@@ -1058,6 +1114,12 @@
           showToast('Failed to parse JSON file: ' + error.message, 'error');
         }
       };
+      
+      reader.onerror = function() {
+        const errorMsg = reader.error ? reader.error.name : 'Unknown error';
+        showToast('Failed to read file (' + errorMsg + '). Please try again.', 'error');
+      };
+      
       reader.readAsText(file);
     }
 
