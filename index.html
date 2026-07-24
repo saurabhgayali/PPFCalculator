@@ -1014,9 +1014,9 @@
 
     /* Export All App Data to JSON */
     function exportAppDataJSON() {
-      const timestamp = new Date().toISOString();
+      const dateStr = new Date().toISOString().split('T')[0];
       const jsonData = {
-        exportTimestamp: timestamp,
+        exportDate: dateStr,
         appData: state
       };
 
@@ -1024,7 +1024,6 @@
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
       const link = document.createElement("a");
-      const dateStr = timestamp.split('T')[0];
       link.setAttribute("href", url);
       link.setAttribute("download", `PPF_Calculator_Export_${dateStr}.json`);
       document.body.appendChild(link);
@@ -1095,7 +1094,7 @@
               cutoffRule: (importedAppData.cutoffRule === 'strict' || importedAppData.cutoffRule === 'none') ? importedAppData.cutoffRule : state.cutoffRule,
               fyStartMonth: typeof importedAppData.fyStartMonth === 'number' ? importedAppData.fyStartMonth : state.fyStartMonth,
               creditingMode: (importedAppData.creditingMode === 'fy_end' || importedAppData.creditingMode === 'monthly' || importedAppData.creditingMode === 'simple_accum') ? importedAppData.creditingMode : state.creditingMode,
-              deposits: Array.isArray(importedAppData.deposits) ? validatedDeposits : state.deposits,
+              deposits: Array.isArray(importedAppData.deposits) ? validatedDeposits : [],
               rateType: (importedAppData.rateType === 'fixed' || importedAppData.rateType === 'variable') ? importedAppData.rateType : state.rateType,
               variableRates: validatedRates,
               calculatedSchedule: []
