@@ -100,6 +100,10 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+
+    .hidden-file-input {
+      display: none;
+    }
   </style>
 </head>
 <body class="min-h-full flex flex-col bg-slate-100 text-slate-800 antialiased selection:bg-emerald-200">
@@ -134,7 +138,7 @@
       <button id="btnImportJSON" class="bg-blue-800 hover:bg-blue-900 text-white px-3 py-1.5 rounded border border-blue-600 transition flex items-center gap-1.5" title="Import app data and parameters from JSON file">
         <i class="fa-solid fa-upload text-blue-300"></i> Import JSON
       </button>
-      <input type="file" id="jsonImportInput" accept=".json" style="display: none;">
+      <input type="file" id="jsonImportInput" accept=".json" class="hidden-file-input">
       <button id="btnReset" class="bg-rose-800/80 hover:bg-rose-900 text-white px-3 py-1.5 rounded border border-rose-600 transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Reset
       </button>
@@ -1094,7 +1098,7 @@
               cutoffRule: (importedAppData.cutoffRule === 'strict' || importedAppData.cutoffRule === 'none') ? importedAppData.cutoffRule : state.cutoffRule,
               fyStartMonth: typeof importedAppData.fyStartMonth === 'number' ? importedAppData.fyStartMonth : state.fyStartMonth,
               creditingMode: (importedAppData.creditingMode === 'fy_end' || importedAppData.creditingMode === 'monthly' || importedAppData.creditingMode === 'simple_accum') ? importedAppData.creditingMode : state.creditingMode,
-              deposits: Array.isArray(importedAppData.deposits) ? validatedDeposits : [],
+              deposits: validatedDeposits,
               rateType: (importedAppData.rateType === 'fixed' || importedAppData.rateType === 'variable') ? importedAppData.rateType : state.rateType,
               variableRates: validatedRates,
               calculatedSchedule: []
